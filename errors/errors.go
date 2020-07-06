@@ -11,7 +11,13 @@ import (
 //go:generate protoc -I. --go_out=paths=source_relative:. errors.proto
 
 func (e *Error) Error() string {
-	b, _ := json.Marshal(e)
+        data := make(map[string]interface{})
+	data["status"] = e.Code
+	data["code"] = e.Code
+	data["message"] = e.Id+","+e.Detail
+	data["id"] = e.Id
+	data["data"] = nil
+        b, _ := json.Marshal(data)
 	return string(b)
 }
 
