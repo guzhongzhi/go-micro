@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/micro/go-micro/v2/metadata"
-	"github.com/micro/go-micro/v2/router"
-	"github.com/micro/go-micro/v2/selector/random"
+	"github.com/asim/go-micro/v3/metadata"
+	"github.com/asim/go-micro/v3/router/registry"
+	"github.com/asim/go-micro/v3/selector/random"
 )
 
 // Write sets the status and body on a http ResponseWriter
@@ -30,7 +30,7 @@ func WriteBadRequestError(w http.ResponseWriter, err error) {
 		WriteInternalServerError(w, err)
 		return
 	}
-	Write(w, "application/json", 400, string(rawBody))
+	Write(w, "application/json", http.StatusBadRequest, string(rawBody))
 }
 
 // WriteInternalServerError sets a 500 status code
@@ -47,7 +47,7 @@ func WriteInternalServerError(w http.ResponseWriter, err error) {
 
 func NewRoundTripper(opts ...Option) http.RoundTripper {
 	options := Options{
-		Router: router.DefaultRouter,
+		Router: registry.NewRouter(),
 	}
 	for _, o := range opts {
 		o(&options)

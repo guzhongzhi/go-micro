@@ -4,17 +4,23 @@ import (
 	"context"
 	"time"
 
-	"github.com/micro/go-micro/v2/broker"
-	"github.com/micro/go-micro/v2/codec"
-	"github.com/micro/go-micro/v2/registry"
-	"github.com/micro/go-micro/v2/router"
-	"github.com/micro/go-micro/v2/selector"
-	"github.com/micro/go-micro/v2/transport"
+	"github.com/asim/go-micro/v3/broker"
+	"github.com/asim/go-micro/v3/broker/http"
+	"github.com/asim/go-micro/v3/codec"
+	"github.com/asim/go-micro/v3/registry"
+	"github.com/asim/go-micro/v3/router"
+	regRouter "github.com/asim/go-micro/v3/router/registry"
+	"github.com/asim/go-micro/v3/selector"
+	"github.com/asim/go-micro/v3/selector/roundrobin"
+	"github.com/asim/go-micro/v3/transport"
+	thttp "github.com/asim/go-micro/v3/transport/http"
 )
 
 type Options struct {
 	// Used to select codec
 	ContentType string
+	// Proxy address to send requests via
+	Proxy string
 
 	// Plugged interfaces
 	Broker    broker.Broker
@@ -23,12 +29,12 @@ type Options struct {
 	Selector  selector.Selector
 	Transport transport.Transport
 
+	// Lookup used for looking up routes
+	Lookup LookupFunc
+
 	// Connection Pool
 	PoolSize int
 	PoolTTL  time.Duration
-
-	// Response cache
-	Cache *Cache
 
 	// Middleware for client
 	Wrappers []Wrapper
@@ -46,8 +52,6 @@ type CallOptions struct {
 	Address []string
 	// Backoff func
 	Backoff BackoffFunc
-	// Duration to cache the response for
-	CacheExpiry time.Duration
 	// Transport Dial Timeout
 	DialTimeout time.Duration
 	// Number of Call attempts
@@ -64,8 +68,8 @@ type CallOptions struct {
 	SelectOptions []selector.SelectOption
 	// Stream timeout for the stream
 	StreamTimeout time.Duration
-	// Use the services own auth token
-	ServiceToken bool
+	// Use the auth token as the authorization header
+	AuthToken bool
 	// Network to lookup the route within
 	Network string
 
@@ -100,9 +104,8 @@ type RequestOptions struct {
 
 func NewOptions(options ...Option) Options {
 	opts := Options{
-		Cache:       NewCache(),
 		Context:     context.Background(),
-		ContentType: DefaultContentType,
+		ContentType: "application/protobuf",
 		Codecs:      make(map[string]codec.NewCodec),
 		CallOptions: CallOptions{
 			Backoff:        DefaultBackoff,
@@ -111,12 +114,13 @@ func NewOptions(options ...Option) Options {
 			RequestTimeout: DefaultRequestTimeout,
 			DialTimeout:    transport.DefaultDialTimeout,
 		},
+		Lookup:    LookupRoute,
 		PoolSize:  DefaultPoolSize,
 		PoolTTL:   DefaultPoolTTL,
-		Broker:    broker.DefaultBroker,
-		Router:    router.DefaultRouter,
-		Selector:  selector.DefaultSelector,
-		Transport: transport.DefaultTransport,
+		Broker:    http.NewBroker(),
+		Router:    regRouter.NewRouter(),
+		Selector:  roundrobin.NewSelector(),
+		Transport: thttp.NewTransport(),
 	}
 
 	for _, o := range options {
@@ -147,6 +151,13 @@ func ContentType(ct string) Option {
 	}
 }
 
+// Proxy sets the proxy address
+func Proxy(addr string) Option {
+	return func(o *Options) {
+		o.Proxy = addr
+	}
+}
+
 // PoolSize sets the connection pool size
 func PoolSize(d int) Option {
 	return func(o *Options) {
@@ -165,6 +176,13 @@ func PoolTTL(d time.Duration) Option {
 func Transport(t transport.Transport) Option {
 	return func(o *Options) {
 		o.Transport = t
+	}
+}
+
+// Registry sets the routers registry
+func Registry(r registry.Registry) Option {
+	return func(o *Options) {
+		o.Router.Init(router.Registry(r))
 	}
 }
 
@@ -204,6 +222,13 @@ func Backoff(fn BackoffFunc) Option {
 	}
 }
 
+// Lookup sets the lookup function to use for resolving service names
+func Lookup(l LookupFunc) Option {
+	return func(o *Options) {
+		o.Lookup = l
+	}
+}
+
 // Number of retries when making the request.
 // Should this be a Call Option?
 func Retries(i int) Option {
@@ -216,13 +241,6 @@ func Retries(i int) Option {
 func Retry(fn RetryFunc) Option {
 	return func(o *Options) {
 		o.CallOptions.Retry = fn
-	}
-}
-
-// Registry sets the routers registry
-func Registry(r registry.Registry) Option {
-	return func(o *Options) {
-		o.Router.Init(router.Registry(r))
 	}
 }
 
@@ -325,19 +343,11 @@ func WithDialTimeout(d time.Duration) CallOption {
 	}
 }
 
-// WithServiceToken is a CallOption which overrides the
+// WithAuthToken is a CallOption which overrides the
 // authorization header with the services own auth token
-func WithServiceToken() CallOption {
+func WithAuthToken() CallOption {
 	return func(o *CallOptions) {
-		o.ServiceToken = true
-	}
-}
-
-// WithCache is a CallOption which sets the duration the response
-// shoull be cached for
-func WithCache(c time.Duration) CallOption {
-	return func(o *CallOptions) {
-		o.CacheExpiry = c
+		o.AuthToken = true
 	}
 }
 

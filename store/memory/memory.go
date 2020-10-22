@@ -2,14 +2,15 @@
 package memory
 
 import (
+	"errors"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/micro/go-micro/v2/store"
+	"github.com/asim/go-micro/v3/store"
 	"github.com/patrickmn/go-cache"
-	"github.com/pkg/errors"
 )
 
 // NewStore returns a memory store
@@ -19,7 +20,7 @@ func NewStore(opts ...store.Option) store.Store {
 			Database: "micro",
 			Table:    "micro",
 		},
-		store: cache.New(cache.NoExpiration, 5*time.Minute),
+		stores: map[string]*cache.Cache{}, // cache.New(cache.NoExpiration, 5*time.Minute),
 	}
 	for _, o := range opts {
 		o(&s.options)
@@ -28,9 +29,10 @@ func NewStore(opts ...store.Option) store.Store {
 }
 
 type memoryStore struct {
+	sync.RWMutex
 	options store.Options
 
-	store *cache.Cache
+	stores map[string]*cache.Cache
 }
 
 type storeRecord struct {
@@ -38,10 +40,6 @@ type storeRecord struct {
 	value     []byte
 	metadata  map[string]interface{}
 	expiresAt time.Time
-}
-
-func (m *memoryStore) key(prefix, key string) string {
-	return filepath.Join(prefix, key)
 }
 
 func (m *memoryStore) prefix(database, table string) string {
@@ -54,11 +52,24 @@ func (m *memoryStore) prefix(database, table string) string {
 	return filepath.Join(database, table)
 }
 
-func (m *memoryStore) get(prefix, key string) (*store.Record, error) {
-	key = m.key(prefix, key)
+func (m *memoryStore) getStore(prefix string) *cache.Cache {
+	m.RLock()
+	store := m.stores[prefix]
+	m.RUnlock()
+	if store == nil {
+		m.Lock()
+		if m.stores[prefix] == nil {
+			m.stores[prefix] = cache.New(cache.NoExpiration, 5*time.Minute)
+		}
+		store = m.stores[prefix]
+		m.Unlock()
+	}
+	return store
+}
 
+func (m *memoryStore) get(prefix, key string) (*store.Record, error) {
 	var storedRecord *storeRecord
-	r, found := m.store.Get(key)
+	r, found := m.getStore(prefix).Get(key)
 	if !found {
 		return nil, store.ErrNotFound
 	}
@@ -91,8 +102,6 @@ func (m *memoryStore) get(prefix, key string) (*store.Record, error) {
 }
 
 func (m *memoryStore) set(prefix string, r *store.Record) {
-	key := m.key(prefix, r.Key)
-
 	// copy the incoming record and then
 	// convert the expiry in to a hard timestamp
 	i := &storeRecord{}
@@ -113,43 +122,54 @@ func (m *memoryStore) set(prefix string, r *store.Record) {
 		i.metadata[k] = v
 	}
 
-	m.store.Set(key, i, r.Expiry)
+	m.getStore(prefix).Set(r.Key, i, r.Expiry)
 }
 
 func (m *memoryStore) delete(prefix, key string) {
-	key = m.key(prefix, key)
-	m.store.Delete(key)
+	m.getStore(prefix).Delete(key)
 }
 
-func (m *memoryStore) list(prefix string, limit, offset uint) []string {
-	allItems := m.store.Items()
-	allKeys := make([]string, len(allItems))
-	i := 0
+func (m *memoryStore) list(prefix string, limit, offset uint, prefixFilter, suffixFilter string) []string {
 
+	allItems := m.getStore(prefix).Items()
+
+	allKeys := make([]string, len(allItems))
+
+	// construct list of keys for this prefix
+	i := 0
 	for k := range allItems {
-		if !strings.HasPrefix(k, prefix+"/") {
-			continue
-		}
-		allKeys[i] = strings.TrimPrefix(k, prefix+"/")
+		allKeys[i] = k
 		i++
 	}
-
-	if limit != 0 || offset != 0 {
-		sort.Slice(allKeys, func(i, j int) bool { return allKeys[i] < allKeys[j] })
-		min := func(i, j uint) uint {
-			if i < j {
-				return i
-			}
-			return j
+	keys := make([]string, 0, len(allKeys))
+	sort.Slice(allKeys, func(i, j int) bool { return allKeys[i] < allKeys[j] })
+	for _, k := range allKeys {
+		if prefixFilter != "" && !strings.HasPrefix(k, prefixFilter) {
+			continue
 		}
-		return allKeys[offset:min(limit, uint(len(allKeys)))]
+		if suffixFilter != "" && !strings.HasSuffix(k, suffixFilter) {
+			continue
+		}
+		if offset > 0 {
+			offset--
+			continue
+		}
+		keys = append(keys, k)
+		// this check still works if no limit was passed to begin with, you'll just end up with large -ve value
+		if limit == 1 {
+			break
+		}
+		limit--
 	}
-
-	return allKeys
+	return keys
 }
 
 func (m *memoryStore) Close() error {
-	m.store.Flush()
+	m.Lock()
+	defer m.Unlock()
+	for _, s := range m.stores {
+		s.Flush()
+	}
 	return nil
 }
 
@@ -173,22 +193,17 @@ func (m *memoryStore) Read(key string, opts ...store.ReadOption) ([]*store.Recor
 	prefix := m.prefix(readOpts.Database, readOpts.Table)
 
 	var keys []string
-
 	// Handle Prefix / suffix
 	if readOpts.Prefix || readOpts.Suffix {
-		k := m.list(prefix, readOpts.Limit, readOpts.Offset)
-
-		for _, kk := range k {
-			if readOpts.Prefix && !strings.HasPrefix(kk, key) {
-				continue
-			}
-
-			if readOpts.Suffix && !strings.HasSuffix(kk, key) {
-				continue
-			}
-
-			keys = append(keys, kk)
+		prefixFilter := ""
+		if readOpts.Prefix {
+			prefixFilter = key
 		}
+		suffixFilter := ""
+		if readOpts.Suffix {
+			suffixFilter = key
+		}
+		keys = m.list(prefix, readOpts.Limit, readOpts.Offset, prefixFilter, suffixFilter)
 	} else {
 		keys = []string{key}
 	}
@@ -222,13 +237,6 @@ func (m *memoryStore) Write(r *store.Record, opts ...store.WriteOption) error {
 		newRecord.Metadata = make(map[string]interface{})
 		copy(newRecord.Value, r.Value)
 		newRecord.Expiry = r.Expiry
-
-		if !writeOpts.Expiry.IsZero() {
-			newRecord.Expiry = time.Until(writeOpts.Expiry)
-		}
-		if writeOpts.TTL != 0 {
-			newRecord.Expiry = writeOpts.TTL
-		}
 
 		for k, v := range r.Metadata {
 			newRecord.Metadata[k] = v
@@ -267,27 +275,6 @@ func (m *memoryStore) List(opts ...store.ListOption) ([]string, error) {
 	}
 
 	prefix := m.prefix(listOptions.Database, listOptions.Table)
-	keys := m.list(prefix, listOptions.Limit, listOptions.Offset)
-
-	if len(listOptions.Prefix) > 0 {
-		var prefixKeys []string
-		for _, k := range keys {
-			if strings.HasPrefix(k, listOptions.Prefix) {
-				prefixKeys = append(prefixKeys, k)
-			}
-		}
-		keys = prefixKeys
-	}
-
-	if len(listOptions.Suffix) > 0 {
-		var suffixKeys []string
-		for _, k := range keys {
-			if strings.HasSuffix(k, listOptions.Suffix) {
-				suffixKeys = append(suffixKeys, k)
-			}
-		}
-		keys = suffixKeys
-	}
-
+	keys := m.list(prefix, listOptions.Limit, listOptions.Offset, listOptions.Prefix, listOptions.Suffix)
 	return keys, nil
 }

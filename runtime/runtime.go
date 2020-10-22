@@ -7,54 +7,42 @@ import (
 )
 
 var (
-	// DefaultRuntime is default micro runtime
-	DefaultRuntime Runtime = NewRuntime()
-	// DefaultName is default runtime service name
-	DefaultName = "go.micro.runtime"
-
-	ErrAlreadyExists = errors.New("already exists")
+	ErrAlreadyExists   = errors.New("already exists")
+	ErrInvalidResource = errors.New("invalid resource")
+	ErrNotFound        = errors.New("not found")
 )
 
 // Runtime is a service runtime manager
 type Runtime interface {
 	// Init initializes runtime
 	Init(...Option) error
-	// Create registers a service
-	Create(*Service, ...CreateOption) error
-	// Read returns the service
+	// Create a resource
+	Create(Resource, ...CreateOption) error
+	// Read a resource
 	Read(...ReadOption) ([]*Service, error)
-	// Update the service in place
-	Update(*Service, ...UpdateOption) error
-	// Remove a service
-	Delete(*Service, ...DeleteOption) error
-	// Logs returns the logs for a service
-	Logs(*Service, ...LogsOption) (LogStream, error)
-	// Start starts the runtime
-	Start() error
+	// Update a resource
+	Update(Resource, ...UpdateOption) error
+	// Delete a resource
+	Delete(Resource, ...DeleteOption) error
+	// Logs returns the logs for a resource
+	Logs(Resource, ...LogsOption) (Logs, error)
 	// Stop shuts down the runtime
 	Stop() error
-	// String describes runtime
+	// String defines the runtime implementation
 	String() string
 }
 
-// Stream returns a log stream
-type LogStream interface {
+// Logs returns a log stream
+type Logs interface {
 	Error() error
-	Chan() chan LogRecord
+	Chan() chan Log
 	Stop() error
 }
 
-type LogRecord struct {
+// Log is a log message
+type Log struct {
 	Message  string
 	Metadata map[string]string
-}
-
-// Scheduler is a runtime service scheduler
-type Scheduler interface {
-	// Notify publishes schedule events
-	Notify() (<-chan Event, error)
-	// Close stops the scheduler
-	Close() error
 }
 
 // EventType defines schedule event
@@ -97,14 +85,38 @@ type Event struct {
 	Options *CreateOptions
 }
 
-// Service is runtime service
-type Service struct {
-	// Name of the service
-	Name string
-	// Version of the service
-	Version string
-	// url location of source
-	Source string
-	// Metadata stores metadata
-	Metadata map[string]string
+// ServiceStatus defines service statuses
+type ServiceStatus int
+
+const (
+	// Unknown indicates the status of the service is not known
+	Unknown ServiceStatus = iota
+	// Pending is the initial status of a service
+	Pending
+	// Building is the status when the service is being built
+	Building
+	// Starting is the status when the service has been started but is not yet ready to accept traffic
+	Starting
+	// Running is the status when the service is active and accepting traffic
+	Running
+	// Stopping is the status when a service is stopping
+	Stopping
+	// Stopped is the status when a service has been stopped or has completed
+	Stopped
+	// Error is the status when an error occured, this could be a build error or a run error. The error
+	// details can be found within the service's metadata
+	Error
+)
+
+// Resources which are allocated to a serivce
+type Resources struct {
+	// CPU is the maximum amount of CPU the service will be allocated (unit millicpu)
+	// e.g. 0.25CPU would be passed as 250
+	CPU int
+	// Mem is the maximum amount of memory the service will be allocated (unit mebibyte)
+	// e.g. 128 MiB of memory would be passed as 128
+	Mem int
+	// Disk is the maximum amount of disk space the service will be allocated (unit mebibyte)
+	// e.g. 128 MiB of memory would be passed as 128
+	Disk int
 }

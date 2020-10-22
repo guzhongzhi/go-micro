@@ -2,9 +2,6 @@ package store
 
 import (
 	"context"
-	"time"
-
-	"github.com/micro/go-micro/v2/client"
 )
 
 // Options contains configuration for the Store
@@ -19,8 +16,6 @@ type Options struct {
 	Table string
 	// Context should contain all implementation specific options, using context.WithValue.
 	Context context.Context
-	// Client to use for RPC
-	Client client.Client
 }
 
 // Option sets values in Options
@@ -53,13 +48,6 @@ func Table(t string) Option {
 func WithContext(c context.Context) Option {
 	return func(o *Options) {
 		o.Context = c
-	}
-}
-
-// WithClient sets the stores client to use for RPC
-func WithClient(c client.Client) Option {
-	return func(o *Options) {
-		o.Client = c
 	}
 }
 
@@ -119,10 +107,6 @@ func ReadOffset(o uint) ReadOption {
 // If Expiry and TTL are set TTL takes precedence
 type WriteOptions struct {
 	Database, Table string
-	// Expiry is the time the record expires
-	Expiry time.Time
-	// TTL is the time until the record expires
-	TTL time.Duration
 }
 
 // WriteOption sets values in WriteOptions
@@ -133,20 +117,6 @@ func WriteTo(database, table string) WriteOption {
 	return func(w *WriteOptions) {
 		w.Database = database
 		w.Table = table
-	}
-}
-
-// WriteExpiry is the time the record expires
-func WriteExpiry(t time.Time) WriteOption {
-	return func(w *WriteOptions) {
-		w.Expiry = t
-	}
-}
-
-// WriteTTL is the time the record expires
-func WriteTTL(d time.Duration) WriteOption {
-	return func(w *WriteOptions) {
-		w.TTL = d
 	}
 }
 

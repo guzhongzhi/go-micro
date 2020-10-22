@@ -3,8 +3,9 @@ package router
 import (
 	"context"
 
+	"github.com/asim/go-micro/v3/registry"
+	"github.com/asim/go-micro/v3/registry/memory"
 	"github.com/google/uuid"
-	"github.com/micro/go-micro/v2/registry"
 )
 
 // Options are router options
@@ -19,12 +20,10 @@ type Options struct {
 	Network string
 	// Registry is the local registry
 	Registry registry.Registry
-	// Advertise is the advertising strategy
-	Advertise Strategy
 	// Context for additional options
 	Context context.Context
-	// Prewarm the route table on router startup
-	Prewarm bool
+	// Cache routes
+	Cache bool
 }
 
 // Id sets Router Id
@@ -62,28 +61,32 @@ func Registry(r registry.Registry) Option {
 	}
 }
 
-// Advertise sets route advertising strategy
-func Advertise(a Strategy) Option {
+// Cache the routes
+func Cache() Option {
 	return func(o *Options) {
-		o.Advertise = a
-	}
-}
-
-// Prewarm sets whether to prewarm the route table
-func Prewarm(b bool) Option {
-	return func(o *Options) {
-		o.Prewarm = b
+		o.Cache = true
 	}
 }
 
 // DefaultOptions returns router default options
 func DefaultOptions() Options {
 	return Options{
-		Id:        uuid.New().String(),
-		Address:   DefaultAddress,
-		Network:   DefaultNetwork,
-		Registry:  registry.DefaultRegistry,
-		Advertise: AdvertiseLocal,
-		Context:   context.Background(),
+		Id:       uuid.New().String(),
+		Network:  DefaultNetwork,
+		Registry: memory.NewRegistry(),
+		Context:  context.Background(),
+	}
+}
+
+type ReadOptions struct {
+	Service string
+}
+
+type ReadOption func(o *ReadOptions)
+
+// ReadService sets the service to read from the table
+func ReadService(s string) ReadOption {
+	return func(o *ReadOptions) {
+		o.Service = s
 	}
 }

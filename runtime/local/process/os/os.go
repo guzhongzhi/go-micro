@@ -10,16 +10,16 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/micro/go-micro/v2/runtime/local/process"
+	"github.com/asim/go-micro/v3/runtime/local/process"
 )
 
-func (p *Process) Exec(exe *process.Executable) error {
+func (p *Process) Exec(exe *process.Binary) error {
 	cmd := exec.Command(exe.Package.Path)
 	cmd.Dir = exe.Dir
 	return cmd.Run()
 }
 
-func (p *Process) Fork(exe *process.Executable) (*process.PID, error) {
+func (p *Process) Fork(exe *process.Binary) (*process.PID, error) {
 
 	// create command
 	cmd := exec.Command(exe.Package.Path, exe.Args...)

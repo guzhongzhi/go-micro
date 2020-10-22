@@ -6,12 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/micro/go-micro/v2/auth"
-	"github.com/micro/go-micro/v2/broker"
-	"github.com/micro/go-micro/v2/codec"
-	"github.com/micro/go-micro/v2/debug/trace"
-	"github.com/micro/go-micro/v2/registry"
-	"github.com/micro/go-micro/v2/transport"
+	"github.com/asim/go-micro/v3/auth"
+	"github.com/asim/go-micro/v3/broker"
+	"github.com/asim/go-micro/v3/broker/http"
+	"github.com/asim/go-micro/v3/codec"
+	"github.com/asim/go-micro/v3/debug/trace"
+	"github.com/asim/go-micro/v3/registry"
+	"github.com/asim/go-micro/v3/registry/memory"
+	"github.com/asim/go-micro/v3/transport"
+	thttp "github.com/asim/go-micro/v3/transport/http"
 )
 
 type Options struct {
@@ -61,20 +64,16 @@ func newOptions(opt ...Option) Options {
 		o(&opts)
 	}
 
-	if opts.Auth == nil {
-		opts.Auth = auth.DefaultAuth
-	}
-
 	if opts.Broker == nil {
-		opts.Broker = broker.DefaultBroker
+		opts.Broker = http.NewBroker()
 	}
 
 	if opts.Registry == nil {
-		opts.Registry = registry.DefaultRegistry
+		opts.Registry = memory.NewRegistry()
 	}
 
 	if opts.Transport == nil {
-		opts.Transport = transport.DefaultTransport
+		opts.Transport = thttp.NewTransport()
 	}
 
 	if opts.RegisterCheck == nil {
@@ -230,7 +229,7 @@ func TLSConfig(t *tls.Config) Option {
 		// set the default transport if one is not
 		// already set. Required for Init call below.
 		if o.Transport == nil {
-			o.Transport = transport.DefaultTransport
+			o.Transport = thttp.NewTransport()
 		}
 
 		// set the transport tls

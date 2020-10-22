@@ -1,6 +1,6 @@
-# Go Micro [![License](https://img.shields.io/:license-apache-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Go.Dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/micro/go-micro?tab=doc) [![Travis CI](https://api.travis-ci.org/micro/go-micro.svg?branch=master)](https://travis-ci.org/micro/go-micro) [![Go Report Card](https://goreportcard.com/badge/micro/go-micro)](https://goreportcard.com/report/github.com/micro/go-micro) 
+# Go Micro [![License](https://img.shields.io/badge/license-polyform:noncommercial-blue)](https://polyformproject.org/licenses/noncommercial/1.0.0/) [![Go.Dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/asim/go-micro/v3?tab=overview)
 
-Go Micro is a framework for distributed systems development.
+Go Micro is a framework for microservices development.
 
 ## Overview
 
@@ -34,7 +34,8 @@ across the services and retry a different node if there's a problem.
 to seamlessly encode and decode Go types for you. Any variety of messages could be encoded and sent from different clients. The client 
 and server handle this by default. This includes protobuf and json by default.
 
-- **gRPC Transport** - gRPC based request/response with support for bidirectional streaming. We provide an abstraction for synchronous communication. A request made to a service will be automatically resolved, load balanced, dialled and streamed.
+- **RPC Communication** - Synchronous request/response with support for bidirectional streaming. We provide an abstraction for synchronous 
+communication. A request made to a service will be automatically resolved, load balanced, dialled and streamed.
 
 - **Async Messaging** - PubSub is built in as a first class citizen for asynchronous communication and event driven architectures. 
 Event notifications are a core pattern in micro service development. The default messaging system is a HTTP event message broker.
@@ -43,31 +44,13 @@ Event notifications are a core pattern in micro service development. The default
 leadership are built in as a Sync interface. When using an eventually consistent database or scheduling use the Sync interface.
 
 - **Pluggable Interfaces** - Go Micro makes use of Go interfaces for each distributed system abstraction. Because of this these interfaces 
-are pluggable and allows Go Micro to be runtime agnostic. You can plugin any underlying technology. Find plugins in 
-[github.com/micro/go-plugins](https://github.com/micro/go-plugins).
+are pluggable and allows Go Micro to be runtime agnostic. You can plugin any underlying technology. Find external third party (non stdlib) 
+plugins in [github.com/asim/go-plugins](https://github.com/asim/go-plugins).
 
 ## Getting Started
 
-To make use of Go Micro
-
-```golang
-import "github.com/micro/go-micro/v2"
-
-// create a new service
-service := micro.NewService(
-    micro.Name("helloworld"),
-)
-
-// initialise flags
-service.Init()
-
-// start the service
-service.Run()
-```
-
-See the [docs](https://dev.m3o.com) for detailed information on the architecture, installation and use of go-micro.
+See [pkg.go.dev](https://pkg.go.dev/github.com/asim/go-micro/v3?tab=overview) for usage.
 
 ## License
 
-Go Micro is Apache 2.0 licensed.
-
+[Polyform Noncommercial](https://polyformproject.org/licenses/noncommercial/1.0.0/). See [github.com/sponsors/asim](https://github.com/sponsors/asim) for commercial licensing.

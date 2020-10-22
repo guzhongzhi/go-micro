@@ -9,8 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	dlog "github.com/micro/go-micro/v2/debug/log"
 )
 
 func init() {
@@ -94,16 +92,10 @@ func (l *defaultLogger) Log(level Level, v ...interface{}) {
 		fields["file"] = fmt.Sprintf("%s:%d", logCallerfilePath(file), line)
 	}
 
-	rec := dlog.Record{
-		Timestamp: time.Now(),
-		Message:   fmt.Sprint(v...),
-		Metadata:  make(map[string]string, len(fields)),
-	}
-
 	keys := make([]string, 0, len(fields))
-	for k, v := range fields {
+
+	for k, _ := range fields {
 		keys = append(keys, k)
-		rec.Metadata[k] = fmt.Sprintf("%v", v)
 	}
 
 	sort.Strings(keys)
@@ -113,10 +105,8 @@ func (l *defaultLogger) Log(level Level, v ...interface{}) {
 		metadata += fmt.Sprintf(" %s=%v", k, fields[k])
 	}
 
-	dlog.DefaultLog.Write(rec)
-
-	t := rec.Timestamp.Format("2006-01-02 15:04:05")
-	fmt.Printf("%s %s %v\n", t, metadata, rec.Message)
+	t := time.Now().Format("2006-01-02 15:04:05")
+	fmt.Printf("%s %s %v\n", t, metadata, fmt.Sprint(v...))
 }
 
 func (l *defaultLogger) Logf(level Level, format string, v ...interface{}) {
@@ -135,16 +125,9 @@ func (l *defaultLogger) Logf(level Level, format string, v ...interface{}) {
 		fields["file"] = fmt.Sprintf("%s:%d", logCallerfilePath(file), line)
 	}
 
-	rec := dlog.Record{
-		Timestamp: time.Now(),
-		Message:   fmt.Sprintf(format, v...),
-		Metadata:  make(map[string]string, len(fields)),
-	}
-
 	keys := make([]string, 0, len(fields))
-	for k, v := range fields {
+	for k, _ := range fields {
 		keys = append(keys, k)
-		rec.Metadata[k] = fmt.Sprintf("%v", v)
 	}
 
 	sort.Strings(keys)
@@ -154,18 +137,16 @@ func (l *defaultLogger) Logf(level Level, format string, v ...interface{}) {
 		metadata += fmt.Sprintf(" %s=%v", k, fields[k])
 	}
 
-	dlog.DefaultLog.Write(rec)
-
-	t := rec.Timestamp.Format("2006-01-02 15:04:05")
-	fmt.Printf("%s %s %v\n", t, metadata, rec.Message)
+	t := time.Now().Format("2006-01-02 15:04:05")
+	fmt.Printf("%s %s %v\n", t, metadata, fmt.Sprintf(format, v...))
 }
 
-func (n *defaultLogger) Options() Options {
+func (l *defaultLogger) Options() Options {
 	// not guard against options Context values
-	n.RLock()
-	opts := n.opts
-	opts.Fields = copyFields(n.opts.Fields)
-	n.RUnlock()
+	l.RLock()
+	opts := l.opts
+	opts.Fields = copyFields(l.opts.Fields)
+	l.RUnlock()
 	return opts
 }
 

@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/micro/go-micro/v2/config/loader"
-	"github.com/micro/go-micro/v2/config/reader"
-	"github.com/micro/go-micro/v2/config/reader/json"
-	"github.com/micro/go-micro/v2/config/source"
+	"github.com/asim/go-micro/v3/config/loader"
+	"github.com/asim/go-micro/v3/config/reader"
+	"github.com/asim/go-micro/v3/config/reader/json"
+	"github.com/asim/go-micro/v3/config/source"
 )
 
 type memory struct {
@@ -176,6 +176,11 @@ func (m *memory) update() {
 			value:   vals.Get(w.path...),
 		}
 
+		select {
+		case <-w.exit:
+			continue
+		default:
+		}
 		select {
 		case w.updates <- uv:
 		default:

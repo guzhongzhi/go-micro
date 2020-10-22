@@ -4,36 +4,27 @@ import (
 	"context"
 	"io"
 
-	"github.com/micro/go-micro/v2/client"
+	"github.com/asim/go-micro/v3/client"
 )
 
 type Option func(o *Options)
 
 // Options configure runtime
 type Options struct {
-	// Scheduler for updates
-	Scheduler Scheduler
 	// Service type to manage
 	Type string
-	// Source of the services repository
-	Source string
-	// Base image to use
-	Image string
 	// Client to use when making requests
 	Client client.Client
+	// Base image to use
+	Image string
+	// Source of the services repository
+	Source string
 }
 
 // WithSource sets the base image / repository
 func WithSource(src string) Option {
 	return func(o *Options) {
 		o.Source = src
-	}
-}
-
-// WithScheduler specifies a scheduler for updates
-func WithScheduler(n Scheduler) Option {
-	return func(o *Options) {
-		o.Scheduler = n
 	}
 }
 
@@ -70,6 +61,8 @@ type CreateOptions struct {
 	Args []string
 	// Environment to configure
 	Env []string
+	// Entrypoint within the folder (e.g. in the case of a mono-repo)
+	Entrypoint string
 	// Log output
 	Output io.Writer
 	// Type of service to create
@@ -78,10 +71,20 @@ type CreateOptions struct {
 	Retries int
 	// Specify the image to use
 	Image string
+	// Port to expose
+	Port string
 	// Namespace to create the service in
 	Namespace string
 	// Specify the context to use
 	Context context.Context
+	// Secrets to use
+	Secrets map[string]string
+	// Resources to allocate the service
+	Resources *Resources
+	// Volumes to mount
+	Volumes map[string]string
+	// ServiceAccount to start the container with
+	ServiceAccount string
 }
 
 // ReadOptions queries runtime services
@@ -126,6 +129,31 @@ func CreateContext(ctx context.Context) CreateOption {
 	}
 }
 
+// CreateEntrypoint sets the entrypoint
+func CreateEntrypoint(e string) CreateOption {
+	return func(o *CreateOptions) {
+		o.Entrypoint = e
+	}
+}
+
+// WithServiceAccount sets the ServiceAccount
+func WithServiceAccount(s string) CreateOption {
+	return func(o *CreateOptions) {
+		o.ServiceAccount = s
+	}
+}
+
+// WithSecret sets a secret to provide the service with
+func WithSecret(key, value string) CreateOption {
+	return func(o *CreateOptions) {
+		if o.Secrets == nil {
+			o.Secrets = map[string]string{key: value}
+		} else {
+			o.Secrets[key] = value
+		}
+	}
+}
+
 // WithCommand specifies the command to execute
 func WithCommand(cmd ...string) CreateOption {
 	return func(o *CreateOptions) {
@@ -160,6 +188,31 @@ func WithEnv(env []string) CreateOption {
 func WithOutput(out io.Writer) CreateOption {
 	return func(o *CreateOptions) {
 		o.Output = out
+	}
+}
+
+// WithVolume adds a volume to be mounted
+func WithVolume(name, path string) CreateOption {
+	return func(o *CreateOptions) {
+		if o.Volumes == nil {
+			o.Volumes = map[string]string{name: path}
+		} else {
+			o.Volumes[name] = path
+		}
+	}
+}
+
+// WithPort sets the port to expose
+func WithPort(p string) CreateOption {
+	return func(o *CreateOptions) {
+		o.Port = p
+	}
+}
+
+// ResourceLimits sets the resources for the service to use
+func ResourceLimits(r *Resources) CreateOption {
+	return func(o *CreateOptions) {
+		o.Resources = r
 	}
 }
 
@@ -201,10 +254,25 @@ func ReadContext(ctx context.Context) ReadOption {
 type UpdateOption func(o *UpdateOptions)
 
 type UpdateOptions struct {
+	// Entrypoint within the folder (e.g. in the case of a mono-repo)
+	Entrypoint string
 	// Namespace the service is running in
 	Namespace string
 	// Specify the context to use
 	Context context.Context
+	// Secrets to use
+	Secrets map[string]string
+}
+
+// WithSecret sets a secret to provide the service with
+func UpdateSecret(key, value string) UpdateOption {
+	return func(o *UpdateOptions) {
+		if o.Secrets == nil {
+			o.Secrets = map[string]string{key: value}
+		} else {
+			o.Secrets[key] = value
+		}
+	}
 }
 
 // UpdateNamespace sets the namespace
@@ -218,6 +286,13 @@ func UpdateNamespace(ns string) UpdateOption {
 func UpdateContext(ctx context.Context) UpdateOption {
 	return func(o *UpdateOptions) {
 		o.Context = ctx
+	}
+}
+
+// UpdateEntrypoint sets the entrypoint
+func UpdateEntrypoint(e string) UpdateOption {
+	return func(o *UpdateOptions) {
+		o.Entrypoint = e
 	}
 }
 

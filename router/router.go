@@ -2,18 +2,21 @@
 package router
 
 import (
-	"time"
+	"errors"
+	"hash/fnv"
 )
 
 var (
-	// DefaultAddress is default router address
-	DefaultAddress = ":8084"
-	// DefaultName is default router service name
-	DefaultName = "go.micro.router"
+	// DefaultLink is default network link
+	DefaultLink = "local"
+	// DefaultLocalMetric is default route cost for a local route
+	DefaultMetric int64 = 1
 	// DefaultNetwork is default micro network
 	DefaultNetwork = "micro"
-	// DefaultRouter is default network router
-	DefaultRouter = NewRouter()
+	// ErrRouteNotFound is returned when no route was found in the routing table
+	ErrRouteNotFound = errors.New("route not found")
+	// ErrDuplicateRoute is returned when the route already exists
+	ErrDuplicateRoute = errors.New("duplicate route")
 )
 
 // Router is an interface for a routing control plane
@@ -24,12 +27,8 @@ type Router interface {
 	Options() Options
 	// The routing table
 	Table() Table
-	// Advertise advertises routes
-	Advertise() (<-chan *Advert, error)
-	// Process processes incoming adverts
-	Process(*Advert) error
 	// Lookup queries routes in the routing table
-	Lookup(...QueryOption) ([]Route, error)
+	Lookup(service string, opts ...LookupOption) ([]Route, error)
 	// Watch returns a watcher which tracks updates to the routing table
 	Watch(opts ...WatchOption) (Watcher, error)
 	// Close the router
@@ -46,10 +45,8 @@ type Table interface {
 	Delete(Route) error
 	// Update route in the routing table
 	Update(Route) error
-	// List all routes in the table
-	List() ([]Route, error)
-	// Query routes in the routing table
-	Query(...QueryOption) ([]Route, error)
+	// Read is for querying the table
+	Read(...ReadOption) ([]Route, error)
 }
 
 // Option used by the router
@@ -61,82 +58,36 @@ type StatusCode int
 const (
 	// Running means the router is up and running
 	Running StatusCode = iota
-	// Advertising means the router is advertising
-	Advertising
 	// Stopped means the router has been stopped
 	Stopped
 	// Error means the router has encountered error
 	Error
 )
 
-// AdvertType is route advertisement type
-type AdvertType int
-
-const (
-	// Announce is advertised when the router announces itself
-	Announce AdvertType = iota
-	// RouteUpdate advertises route updates
-	RouteUpdate
-)
-
-// String returns human readable advertisement type
-func (t AdvertType) String() string {
-	switch t {
-	case Announce:
-		return "announce"
-	case RouteUpdate:
-		return "update"
-	default:
-		return "unknown"
-	}
+// Route is a network route
+type Route struct {
+	// Service is destination service name
+	Service string
+	// Address is service node address
+	Address string
+	// Gateway is route gateway
+	Gateway string
+	// Network is network address
+	Network string
+	// Router is router id
+	Router string
+	// Link is network link
+	Link string
+	// Metric is the route cost metric
+	Metric int64
+	// Metadata for the route
+	Metadata map[string]string
 }
 
-// Advert contains a list of events advertised by the router to the network
-type Advert struct {
-	// Id is the router Id
-	Id string
-	// Type is type of advert
-	Type AdvertType
-	// Timestamp marks the time when the update is sent
-	Timestamp time.Time
-	// TTL is Advert TTL
-	TTL time.Duration
-	// Events is a list of routing table events to advertise
-	Events []*Event
-}
-
-// Strategy is route advertisement strategy
-type Strategy int
-
-// TODO: remove the "Advertise" prefix from these
-const (
-	// AdvertiseAll advertises all routes to the network
-	AdvertiseAll Strategy = iota
-	// AdvertiseBest advertises optimal routes to the network
-	AdvertiseBest
-	// AdvertiseLocal will only advertise the local routes
-	AdvertiseLocal
-	// AdvertiseNone will not advertise any routes
-	AdvertiseNone
-)
-
-// String returns human readable Strategy
-func (s Strategy) String() string {
-	switch s {
-	case AdvertiseAll:
-		return "all"
-	case AdvertiseBest:
-		return "best"
-	case AdvertiseLocal:
-		return "local"
-	case AdvertiseNone:
-		return "none"
-	default:
-		return "unknown"
-	}
-}
-
-// NewRouter creates new Router and returns it
-func NewRouter(opts ...Option) Router {
-	return newRouter(opts...)
+// Hash returns route hash sum.
+func (r *Route) Hash() uint64 {
+	h := fnv.New64()
+	h.Reset()
+	h.Write([]byte(r.Service + r.Address + r.Gateway + r.Network + r.Router + r.Link))
+	return h.Sum64()
 }

@@ -2,14 +2,11 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"time"
 )
 
 const (
-	// BearerScheme used for Authorization header
-	BearerScheme = "Bearer "
 	// ScopePublic is the scope applied to a rule to allow access to the public
 	ScopePublic = ""
 	// ScopeAccount is the scope applied to a rule to limit to users with any valid account
@@ -23,7 +20,7 @@ var (
 	ErrForbidden = errors.New("resource forbidden")
 )
 
-// Auth provides authentication and authorization
+// Auth provides authentication
 type Auth interface {
 	// Init the auth
 	Init(opts ...Option)
@@ -31,25 +28,29 @@ type Auth interface {
 	Options() Options
 	// Generate a new account
 	Generate(id string, opts ...GenerateOption) (*Account, error)
-	// Verify an account has access to a resource using the rules
-	Verify(acc *Account, res *Resource, opts ...VerifyOption) error
 	// Inspect a token
 	Inspect(token string) (*Account, error)
 	// Token generated using refresh token or credentials
 	Token(opts ...TokenOption) (*Token, error)
-	// Grant access to a resource
-	Grant(rule *Rule) error
-	// Revoke access to a resource
-	Revoke(rule *Rule) error
-	// Rules returns all the rules used to verify requests
-	Rules(...RulesOption) ([]*Rule, error)
 	// String returns the name of the implementation
 	String() string
 }
 
+// Rules is an interface for authorization
+type Rules interface {
+	// Grant access to a resource
+	Grant(rule *Rule) error
+	// Revoke access to a resource
+	Revoke(rule *Rule) error
+	// List returns all the rules used to verify requests
+	List(...RulesOption) ([]*Rule, error)
+	// Verify an account has access to a resource using the rules
+	Verify(acc *Account, res *Resource, opts ...VerifyOption) error
+}
+
 // Account provided by an auth provider
 type Account struct {
-	// ID of the account e.g. email
+	// ID of the account e.g. UUID. Should not change
 	ID string `json:"id"`
 	// Type of the account, e.g. service
 	Type string `json:"type"`
@@ -61,6 +62,8 @@ type Account struct {
 	Scopes []string `json:"scopes"`
 	// Secret for the account, e.g. the password
 	Secret string `json:"secret"`
+	// Name of the account. User friendly name that might change e.g. a username or email
+	Name string `json:"name"`
 }
 
 // Token can be short or long lived
@@ -114,20 +117,4 @@ type Rule struct {
 	// Priority the rule should take when verifying a request, the higher the value the sooner the
 	// rule will be applied
 	Priority int32
-}
-
-type accountKey struct{}
-
-// AccountFromContext gets the account from the context, which
-// is set by the auth wrapper at the start of a call. If the account
-// is not set, a nil account will be returned. The error is only returned
-// when there was a problem retrieving an account
-func AccountFromContext(ctx context.Context) (*Account, bool) {
-	acc, ok := ctx.Value(accountKey{}).(*Account)
-	return acc, ok
-}
-
-// ContextWithAccount sets the account in the context
-func ContextWithAccount(ctx context.Context, account *Account) context.Context {
-	return context.WithValue(ctx, accountKey{}, account)
 }

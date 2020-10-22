@@ -1,5 +1,5 @@
 // Package store is an interface for distributed data storage.
-// The design document is located at https://github.com/micro/development/blob/master/design/store.md
+// The design document is located at https://github.com/micro/development/blob/master/design/framework/store.md
 package store
 
 import (
@@ -10,8 +10,6 @@ import (
 var (
 	// ErrNotFound is returned when a key doesn't exist
 	ErrNotFound = errors.New("not found")
-	// DefaultStore is the memory store.
-	DefaultStore Store = new(noopStore)
 )
 
 // Store is a data storage interface
