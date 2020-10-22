@@ -16,13 +16,13 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-        data := make(map[string]interface{})
+	data := make(map[string]interface{})
 	data["status"] = e.Code
 	data["code"] = e.Code
 	data["message"] = e.Id+","+e.Detail
 	data["id"] = e.Id
 	data["data"] = nil
-        b, _ := json.Marshal(data)
+	b, _ := json.Marshal(data)
 	return string(b)
 }
 
