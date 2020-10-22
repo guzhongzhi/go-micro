@@ -8,6 +8,14 @@ import (
 	"net/http"
 )
 
+type ErrorFormatter func(*Error) string
+
+var errorFormatter ErrorFormatter
+
+func SetErrorFormatter(fn ErrorFormatter) {
+	errorFormatter = fn
+}
+
 type Error struct {
 	Id     string
 	Code   int32
@@ -19,9 +27,12 @@ func (e *Error) Error() string {
 	data := make(map[string]interface{})
 	data["status"] = e.Code
 	data["code"] = e.Code
-	data["message"] = e.Id+","+e.Detail
+	data["message"] = e.Id + "," + e.Detail
 	data["id"] = e.Id
 	data["data"] = nil
+	if errorFormatter != nil {
+		return errorFormatter(e)
+	}
 	b, _ := json.Marshal(data)
 	return string(b)
 }
